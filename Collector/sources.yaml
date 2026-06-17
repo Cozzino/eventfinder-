@@ -1,0 +1,44 @@
+sources:
+  - name: emiliaromagnaturismo
+    adapter: opendata
+    enabled: true
+
+  - name: parma
+    adapter: parma_plone
+    enabled: true
+    endpoint: https://www.comune.parma.it/api/it/vivere-parma/eventi/@querystring-search
+
+  - name: reggio_emilia
+    adapter: plone
+    enabled: true
+    endpoint: https://www.comune.reggioemilia.it/++api++/vivere-reggio-emilia/eventi/tutti-gli-eventi/@querystring-search
+
+  - name: bologna_sagrefeste
+    adapter: bologna_sagre
+    enabled: true
+    endpoint: https://www.cittametropolitana.bo.it/sagrefeste/tutti_eventi
+
+  - name: rimini
+    adapter: rimini_json
+    enabled: true
+    endpoint: https://www.comune.rimini.it/sites/default/files/feeds/json-cosa-fare.json
+
+  - name: ravenna
+    adapter: universal
+    enabled: true
+    endpoint: https://comune.ravenna.it/vivere-il-comune/eventi/
+
+  - name: faenza
+    adapter: universal
+    enabled: true
+    endpoint: https://faenzaeventi.it/
+
+  - name: cesena
+    adapter: universal
+    enabled: true
+    endpoint: https://www.comune.cesena.fc.it/vivere-il-comune/eventi/
+
+  - name: forli
+    adapter: universal
+    enabled: true
+    endpoint: https://www.comune.forli.fc.it/it/eventi
