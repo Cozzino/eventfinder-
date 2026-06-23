@@ -24,6 +24,24 @@ def health() -> dict[str, str]:
     }
 
 
+@app.get("/stats", response_model=schemas.StatsResponse, tags=["system"])
+def stats(db: Session = Depends(get_db)) -> schemas.StatsResponse:
+    def count(model: type[models.Base], *conditions: object) -> int:
+        statement = select(func.count()).select_from(model)
+        if conditions:
+            statement = statement.where(*conditions)
+        return int(db.scalar(statement) or 0)
+
+    return schemas.StatsResponse(
+        events=count(models.Event),
+        categories=count(models.Category),
+        sources=count(models.Source),
+        high_quality_events=count(models.Event, models.Event.quality_class == "HIGH"),
+        medium_quality_events=count(models.Event, models.Event.quality_class == "MEDIUM"),
+        low_quality_events=count(models.Event, models.Event.quality_class == "LOW"),
+    )
+
+
 @app.get("/events", response_model=list[schemas.EventRead], tags=["events"])
 def list_events(
     category_id: uuid.UUID | None = None,

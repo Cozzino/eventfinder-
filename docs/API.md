@@ -5,36 +5,41 @@ Version: `1.0.0`
 
 ## GET /health
 
-Returns service health information. It has no parameters.
+Returns service health information without querying the database.
 
 ```http
 GET /health
 ```
 
 ```json
+{"status":"ok","service":"eventfinder-api","version":"1.0.0"}
+```
+
+## GET /stats
+
+Returns PostgreSQL row totals and the distribution of event quality classes.
+
+```http
+GET /stats
+```
+
+```json
 {
-  "status": "ok",
-  "service": "eventfinder-api",
-  "version": "1.0.0"
+  "events": 553,
+  "categories": 8,
+  "sources": 9,
+  "high_quality_events": 120,
+  "medium_quality_events": 300,
+  "low_quality_events": 133
 }
 ```
 
 ## GET /events
 
-Returns real events stored in PostgreSQL, ordered by start date and title. An empty database returns `[]`.
-
-Parameters:
-
-- `category_id`: optional category UUID.
-- `city`: optional case-insensitive exact city.
-- `province`: optional case-insensitive exact province.
-- `date_from`: optional minimum start date in ISO 8601 format.
-- `date_to`: optional maximum start date in ISO 8601 format.
-- `limit`: optional integer from 1 to 200, default 20.
-- `offset`: optional non-negative integer, default 0.
+Returns PostgreSQL events ordered by start date and title. Optional parameters are `category_id`, `city`, `province`, `date_from`, `date_to`, `limit` (1-200, default 20), and `offset` (default 0).
 
 ```http
-GET /events?city=Roma&date_from=2026-07-01T00:00:00&limit=2&offset=0
+GET /events?city=Roma&date_from=2026-07-01T00:00:00&limit=5
 ```
 
 ```json
@@ -62,40 +67,9 @@ GET /events?city=Roma&date_from=2026-07-01T00:00:00&limit=2&offset=0
 ]
 ```
 
-## GET /events/{id}
-
-Planned endpoint returning one event by UUID.
-
-```http
-GET /events/7ad3a0f1-4f93-4d7b-9e8e-f4af8cf079d3
-```
-
-```json
-{
-  "id": "7ad3a0f1-4f93-4d7b-9e8e-f4af8cf079d3",
-  "title": "Festival al parco"
-}
-```
-
-## GET /events/nearby
-
-Planned endpoint for events near a geographic point. Parameters are `latitude`, `longitude`, optional `radius_km` (default 10), and optional `limit` (default 20).
-
-```http
-GET /events/nearby?latitude=41.9028&longitude=12.4964&radius_km=5
-```
-
-```json
-{
-  "items": [],
-  "center": {"latitude": 41.9028, "longitude": 12.4964},
-  "radius_km": 5
-}
-```
-
 ## GET /categories
 
-Returns categories from PostgreSQL, ordered by name. It has no parameters and returns `[]` when empty.
+Returns categories from PostgreSQL ordered by name, or `[]` when empty.
 
 ```http
 GET /categories
@@ -112,20 +86,6 @@ GET /categories
 ]
 ```
 
-## GET /search
+## Planned endpoints
 
-Planned keyword search endpoint. Parameters are `q`, optional `city`, optional `category_id`, `limit`, and `offset`.
-
-```http
-GET /search?q=festival&city=Roma
-```
-
-```json
-{
-  "query": "festival",
-  "items": [],
-  "limit": 20,
-  "offset": 0,
-  "total": 0
-}
-```
+`GET /events/{id}`, `GET /events/nearby`, and `GET /search` remain planned for later milestones.

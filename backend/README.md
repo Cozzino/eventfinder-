@@ -2,41 +2,83 @@
 
 FastAPI service for EventFinder, backed by PostgreSQL with PostGIS.
 
-## Setup
+## 1. Install dependencies
 
 Requirements: Python 3.10 or newer, Docker and Docker Compose.
 
 ```bash
-cp backend/.env.example backend/.env
 python -m pip install -r requirements.txt
-docker compose up -d postgres
-uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+cp backend/.env.example backend/.env
 ```
 
-The `postgres` service uses the PostGIS image, persists data in the `eventfinder_postgres_data` volume, and initializes new volumes with `database/schema/eventfinder_schema.sql`.
+On Windows PowerShell, use `Copy-Item backend/.env.example backend/.env` instead of `cp`.
 
-For a database volume created before M3, apply the updated schema once:
+## 2. Start PostgreSQL/PostGIS
 
 ```bash
-psql postgresql://eventfinder:eventfinder@localhost:5432/eventfinder -f database/schema/eventfinder_schema.sql
+docker compose up -d
 ```
 
-## SQLite import
+Wait until the database is healthy:
 
-Import the collector database without modifying it:
+```bash
+docker compose ps
+```
+
+The `postgres` service uses the PostGIS image and persists data in the `eventfinder_postgres_data` volume.
+
+## 3. Apply the database schema
+
+Run the idempotent initializer after PostgreSQL is ready:
+
+```bash
+python backend/scripts/init_db.py
+```
+
+It connects using `DATABASE_URL`, enables PostGIS, and creates or upgrades the tables from `database/schema/eventfinder_schema.sql`.
+
+## 4. Import SQLite events
+
+Place the collector database at the repository root or provide its absolute path:
 
 ```bash
 python backend/scripts/import_sqlite_events.py --sqlite-path ./event_platform_v16.db
 ```
 
-The importer creates missing sources and fallback categories, transfers coordinates and dates, and skips duplicates matched by `source_url` or by source plus `external_id`. It prints counts for read, imported, duplicate, and invalid rows.
+The SQLite file is opened for reading and is not modified. The importer creates missing sources and fallback categories, copies coordinates and dates, calculates quality scores, and skips duplicates matched by `source_url` or source plus `external_id`.
 
 Quality scoring totals 100 points: title 10, description 20, date 25, location 20, coordinates 15, and category 10. Classes are `HIGH` for 80-100, `MEDIUM` for 60-79, and `LOW` for 0-59.
 
-## Endpoints
+## 5. Start the API
 
-- `GET /health` returns API service metadata.
-- `GET /events` reads PostgreSQL events and supports `category_id`, `city`, `province`, `date_from`, `date_to`, `limit`, and `offset`.
-- `GET /categories` returns categories ordered by name.
+```bash
+uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+```
 
-Empty event or category tables return `[]`. Interactive documentation is available at `http://localhost:8000/docs`.
+Interactive documentation is available at `http://localhost:8000/docs`.
+
+## 6. Manual endpoint test
+
+With the API running, execute:
+
+```bash
+curl http://localhost:8000/health
+curl http://localhost:8000/stats
+curl "http://localhost:8000/events?limit=5&offset=0"
+curl http://localhost:8000/categories
+```
+
+Expected behavior:
+
+- `/health` returns service status without querying PostgreSQL.
+- `/stats` returns totals for events, categories, sources, and quality classes.
+- `/events` returns imported PostgreSQL events or `[]` when empty.
+- `/categories` returns database categories or `[]` when empty.
+
+## Shutdown
+
+```bash
+docker compose down
+```
+
+Data remains in the named volume. Use `docker compose down -v` only when the database should be deleted.

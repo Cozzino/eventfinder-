@@ -10,6 +10,15 @@ class HealthResponse(BaseModel):
     version: str = "1.0.0"
 
 
+class StatsResponse(BaseModel):
+    events: int
+    categories: int
+    sources: int
+    high_quality_events: int
+    medium_quality_events: int
+    low_quality_events: int
+
+
 class CategoryBase(BaseModel):
     name: str
     slug: str
