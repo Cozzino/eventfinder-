@@ -1,21 +1,15 @@
 # EventFinder API
 
-Base service: `eventfinder-api`
+Base service: `eventfinder-api`  
 Version: `1.0.0`
 
 ## GET /health
 
-Returns service health information.
-
-Parameters: none.
-
-Example request:
+Returns service health information. It has no parameters.
 
 ```http
 GET /health
 ```
-
-Example response:
 
 ```json
 {
@@ -27,193 +21,111 @@ Example response:
 
 ## GET /events
 
-Returns a paginated list of events, optionally filtered by location, category, and date.
+Returns real events stored in PostgreSQL, ordered by start date and title. An empty database returns `[]`.
 
 Parameters:
 
-- `limit` integer, optional, default `20`.
-- `offset` integer, optional, default `0`.
-- `category_id` UUID, optional.
-- `region` string, optional.
-- `province` string, optional.
-- `city` string, optional.
-- `start_date` ISO datetime, optional.
-- `end_date` ISO datetime, optional.
-
-Example request:
+- `category_id`: optional category UUID.
+- `city`: optional case-insensitive exact city.
+- `province`: optional case-insensitive exact province.
+- `date_from`: optional minimum start date in ISO 8601 format.
+- `date_to`: optional maximum start date in ISO 8601 format.
+- `limit`: optional integer from 1 to 200, default 20.
+- `offset`: optional non-negative integer, default 0.
 
 ```http
-GET /events?city=Roma&limit=2&offset=0
+GET /events?city=Roma&date_from=2026-07-01T00:00:00&limit=2&offset=0
 ```
 
-Example response:
-
 ```json
-{
-  "items": [
-    {
-      "id": "7ad3a0f1-4f93-4d7b-9e8e-f4af8cf079d3",
-      "source_id": "349c4ba9-1341-4328-8527-3e0f8d3dfc21",
-      "category_id": "49b5697e-6460-42bb-a089-a58274a8d1d3",
-      "title": "Concerto al parco",
-      "description": "Evento musicale all'aperto.",
-      "region": "Lazio",
-      "province": "Roma",
-      "city": "Roma",
-      "address": "Via del Parco 1",
-      "latitude": 41.9028,
-      "longitude": 12.4964,
-      "start_date": "2026-07-10T20:30:00",
-      "end_date": "2026-07-10T23:00:00",
-      "source_url": "https://example.com/events/concerto",
-      "quality_score": 85,
-      "quality_class": "high"
-    }
-  ],
-  "limit": 2,
-  "offset": 0,
-  "total": 1
-}
+[
+  {
+    "id": "7ad3a0f1-4f93-4d7b-9e8e-f4af8cf079d3",
+    "source_id": "349c4ba9-1341-4328-8527-3e0f8d3dfc21",
+    "category_id": "49b5697e-6460-42bb-a089-a58274a8d1d3",
+    "external_id": "collector-event-42",
+    "fingerprint": "a9d9ad91f12d",
+    "title": "Festival al parco",
+    "description": "Evento musicale all'aperto.",
+    "region": null,
+    "province": "Roma",
+    "city": "Roma",
+    "address": null,
+    "latitude": 41.9028,
+    "longitude": 12.4964,
+    "start_date": "2026-07-10T20:30:00",
+    "end_date": "2026-07-10T23:00:00",
+    "source_url": "https://example.com/events/festival",
+    "quality_score": 100,
+    "quality_class": "HIGH"
+  }
+]
 ```
 
 ## GET /events/{id}
 
-Returns one event by UUID.
-
-Parameters:
-
-- `id` UUID, required path parameter.
-
-Example request:
+Planned endpoint returning one event by UUID.
 
 ```http
 GET /events/7ad3a0f1-4f93-4d7b-9e8e-f4af8cf079d3
 ```
 
-Example response:
-
 ```json
 {
   "id": "7ad3a0f1-4f93-4d7b-9e8e-f4af8cf079d3",
-  "source_id": "349c4ba9-1341-4328-8527-3e0f8d3dfc21",
-  "category_id": "49b5697e-6460-42bb-a089-a58274a8d1d3",
-  "title": "Concerto al parco",
-  "description": "Evento musicale all'aperto.",
-  "region": "Lazio",
-  "province": "Roma",
-  "city": "Roma",
-  "address": "Via del Parco 1",
-  "latitude": 41.9028,
-  "longitude": 12.4964,
-  "start_date": "2026-07-10T20:30:00",
-  "end_date": "2026-07-10T23:00:00",
-  "source_url": "https://example.com/events/concerto",
-  "quality_score": 85,
-  "quality_class": "high"
+  "title": "Festival al parco"
 }
 ```
 
 ## GET /events/nearby
 
-Returns events near a geographic point.
-
-Parameters:
-
-- `latitude` number, required.
-- `longitude` number, required.
-- `radius_km` number, optional, default `10`.
-- `limit` integer, optional, default `20`.
-
-Example request:
+Planned endpoint for events near a geographic point. Parameters are `latitude`, `longitude`, optional `radius_km` (default 10), and optional `limit` (default 20).
 
 ```http
 GET /events/nearby?latitude=41.9028&longitude=12.4964&radius_km=5
 ```
 
-Example response:
-
 ```json
 {
-  "items": [
-    {
-      "id": "7ad3a0f1-4f93-4d7b-9e8e-f4af8cf079d3",
-      "title": "Concerto al parco",
-      "city": "Roma",
-      "latitude": 41.9028,
-      "longitude": 12.4964,
-      "distance_km": 1.4,
-      "start_date": "2026-07-10T20:30:00"
-    }
-  ],
-  "center": {
-    "latitude": 41.9028,
-    "longitude": 12.4964
-  },
+  "items": [],
+  "center": {"latitude": 41.9028, "longitude": 12.4964},
   "radius_km": 5
 }
 ```
 
 ## GET /categories
 
-Returns available event categories.
-
-Parameters: none.
-
-Example request:
+Returns categories from PostgreSQL, ordered by name. It has no parameters and returns `[]` when empty.
 
 ```http
 GET /categories
 ```
 
-Example response:
-
 ```json
-{
-  "items": [
-    {
-      "id": "49b5697e-6460-42bb-a089-a58274a8d1d3",
-      "name": "Musica",
-      "slug": "musica",
-      "description": "Concerti e spettacoli musicali"
-    }
-  ]
-}
+[
+  {
+    "id": "49b5697e-6460-42bb-a089-a58274a8d1d3",
+    "name": "Festival",
+    "slug": "festival",
+    "description": "Categoria creata automaticamente durante l'importazione SQLite."
+  }
+]
 ```
 
 ## GET /search
 
-Searches events by keyword and optional filters.
-
-Parameters:
-
-- `q` string, required.
-- `city` string, optional.
-- `category_id` UUID, optional.
-- `limit` integer, optional, default `20`.
-- `offset` integer, optional, default `0`.
-
-Example request:
+Planned keyword search endpoint. Parameters are `q`, optional `city`, optional `category_id`, `limit`, and `offset`.
 
 ```http
-GET /search?q=concerto&city=Roma
+GET /search?q=festival&city=Roma
 ```
-
-Example response:
 
 ```json
 {
-  "query": "concerto",
-  "items": [
-    {
-      "id": "7ad3a0f1-4f93-4d7b-9e8e-f4af8cf079d3",
-      "title": "Concerto al parco",
-      "city": "Roma",
-      "start_date": "2026-07-10T20:30:00",
-      "source_url": "https://example.com/events/concerto"
-    }
-  ],
+  "query": "festival",
+  "items": [],
   "limit": 20,
   "offset": 0,
-  "total": 1
+  "total": 0
 }
 ```

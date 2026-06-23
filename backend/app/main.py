@@ -1,5 +1,8 @@
-from fastapi import Depends, FastAPI
-from sqlalchemy import select
+from datetime import datetime
+import uuid
+
+from fastapi import Depends, FastAPI, Query
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import models, schemas
@@ -22,8 +25,32 @@ def health() -> dict[str, str]:
 
 
 @app.get("/events", response_model=list[schemas.EventRead], tags=["events"])
-def list_events(db: Session = Depends(get_db)) -> list[models.Event]:
-    statement = select(models.Event).order_by(models.Event.start_date, models.Event.title)
+def list_events(
+    category_id: uuid.UUID | None = None,
+    city: str | None = None,
+    province: str | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+) -> list[models.Event]:
+    statement = select(models.Event)
+    if category_id is not None:
+        statement = statement.where(models.Event.category_id == category_id)
+    if city:
+        statement = statement.where(func.lower(models.Event.city) == city.strip().lower())
+    if province:
+        statement = statement.where(func.lower(models.Event.province) == province.strip().lower())
+    if date_from is not None:
+        statement = statement.where(models.Event.start_date >= date_from)
+    if date_to is not None:
+        statement = statement.where(models.Event.start_date <= date_to)
+
+    statement = statement.order_by(
+        models.Event.start_date.asc().nulls_last(),
+        models.Event.title,
+    ).limit(limit).offset(offset)
     return list(db.scalars(statement).all())
 
 

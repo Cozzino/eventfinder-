@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     source_id UUID REFERENCES sources(id) ON DELETE SET NULL,
     category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+    external_id VARCHAR(255),
+    fingerprint VARCHAR(255),
     title VARCHAR(500) NOT NULL,
     description TEXT,
     region VARCHAR(100),
@@ -42,10 +44,17 @@ CREATE TABLE IF NOT EXISTS events (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE events ADD COLUMN IF NOT EXISTS external_id VARCHAR(255);
+ALTER TABLE events ADD COLUMN IF NOT EXISTS fingerprint VARCHAR(255);
+
 CREATE INDEX IF NOT EXISTS idx_events_category_id ON events(category_id);
 CREATE INDEX IF NOT EXISTS idx_events_source_id ON events(source_id);
 CREATE INDEX IF NOT EXISTS idx_events_start_date ON events(start_date);
 CREATE INDEX IF NOT EXISTS idx_events_city ON events(city);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_events_source_external_id
+    ON events(source_id, external_id) WHERE external_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_events_source_url_hash
+    ON events ((md5(source_url))) WHERE source_url IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_events_geo ON events USING GIST (
     ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)
 ) WHERE longitude IS NOT NULL AND latitude IS NOT NULL;

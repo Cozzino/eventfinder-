@@ -39,6 +39,8 @@ class SourceRead(SourceBase):
 class EventBase(BaseModel):
     source_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None
+    external_id: str | None = None
+    fingerprint: str | None = None
     title: str = Field(max_length=500)
     description: str | None = None
     region: str | None = None
