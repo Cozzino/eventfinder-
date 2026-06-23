@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: eventfinder-postgis
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: eventfinder
+      POSTGRES_USER: eventfinder
+      POSTGRES_PASSWORD: eventfinder
+    ports:
+      - "5432:5432"
+    volumes:
+      - eventfinder_postgres_data:/var/lib/postgresql/data
+      - ./database/schema/eventfinder_schema.sql:/docker-entrypoint-initdb.d/001-eventfinder-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eventfinder -d eventfinder"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  eventfinder_postgres_data:

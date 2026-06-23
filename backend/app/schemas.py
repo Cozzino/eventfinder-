@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class HealthResponse(BaseModel):
@@ -17,6 +17,8 @@ class CategoryBase(BaseModel):
 
 
 class CategoryRead(CategoryBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
 
 
@@ -29,6 +31,8 @@ class SourceBase(BaseModel):
 
 
 class SourceRead(SourceBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
 
 
@@ -46,11 +50,13 @@ class EventBase(BaseModel):
     start_date: datetime | None = None
     end_date: datetime | None = None
     source_url: str | None = None
-    quality_score: int = 0
+    quality_score: int | None = 0
     quality_class: str | None = None
 
 
 class EventRead(EventBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
 
 

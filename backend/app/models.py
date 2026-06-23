@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,6 +34,7 @@ class Source(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
     events: Mapped[list["Event"]] = relationship(back_populates="source")
+    sync_logs: Mapped[list["SyncLog"]] = relationship(back_populates="source")
 
 
 class Event(Base):
@@ -48,12 +49,12 @@ class Event(Base):
     province: Mapped[str | None] = mapped_column(String(100))
     city: Mapped[str | None] = mapped_column(String(150))
     address: Mapped[str | None] = mapped_column(Text)
-    latitude: Mapped[float | None]
-    longitude: Mapped[float | None]
+    latitude: Mapped[float | None] = mapped_column(Float)
+    longitude: Mapped[float | None] = mapped_column(Float)
     start_date: Mapped[datetime | None] = mapped_column(DateTime)
     end_date: Mapped[datetime | None] = mapped_column(DateTime)
     source_url: Mapped[str | None] = mapped_column(Text)
-    quality_score: Mapped[int] = mapped_column(Integer, default=0)
+    quality_score: Mapped[int | None] = mapped_column(Integer, default=0)
     quality_class: Mapped[str | None] = mapped_column(String(10))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -75,6 +76,8 @@ class SyncLog(Base):
     message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 
+    source: Mapped[Source | None] = relationship(back_populates="sync_logs")
+
 
 class User(Base):
     __tablename__ = "users"
@@ -88,6 +91,7 @@ class User(Base):
 
 class Favorite(Base):
     __tablename__ = "favorites"
+    __table_args__ = (UniqueConstraint("user_id", "event_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
