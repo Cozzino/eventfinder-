@@ -17,39 +17,21 @@ On Windows PowerShell, use `Copy-Item backend/.env.example backend/.env` instead
 
 ```bash
 docker compose up -d
-```
-
-Wait until the database is healthy:
-
-```bash
 docker compose ps
 ```
 
 The `postgres` service uses the PostGIS image and persists data in the `eventfinder_postgres_data` volume.
 
-## 3. Apply the database schema
-
-Run the idempotent initializer after PostgreSQL is ready:
+## 3. Initialize and import
 
 ```bash
 python backend/scripts/init_db.py
-```
-
-It connects using `DATABASE_URL`, enables PostGIS, and creates or upgrades the tables from `database/schema/eventfinder_schema.sql`.
-
-## 4. Import SQLite events
-
-Place the collector database at the repository root or provide its absolute path:
-
-```bash
 python backend/scripts/import_sqlite_events.py --sqlite-path ./event_platform_v16.db
 ```
 
-The SQLite file is opened for reading and is not modified. The importer creates missing sources and fallback categories, copies coordinates and dates, calculates quality scores, and skips duplicates matched by `source_url` or source plus `external_id`.
+The SQLite file is read without being modified. Import is idempotent by source URL or source plus external ID.
 
-Quality scoring totals 100 points: title 10, description 20, date 25, location 20, coordinates 15, and category 10. Classes are `HIGH` for 80-100, `MEDIUM` for 60-79, and `LOW` for 0-59.
-
-## 5. Start the API
+## 4. Start the API
 
 ```bash
 uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -57,23 +39,18 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
 
 Interactive documentation is available at `http://localhost:8000/docs`.
 
-## 6. Manual endpoint test
-
-With the API running, execute:
+## 5. Manual endpoint tests
 
 ```bash
-curl http://localhost:8000/health
-curl http://localhost:8000/stats
-curl "http://localhost:8000/events?limit=5&offset=0"
-curl http://localhost:8000/categories
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/stats
+curl "http://127.0.0.1:8000/events?limit=5"
+curl http://127.0.0.1:8000/categories
+curl "http://127.0.0.1:8000/search?q=festival&limit=5"
+curl "http://127.0.0.1:8000/events/nearby?lat=44.4949&lon=11.3426&radius_km=50&limit=5"
 ```
 
-Expected behavior:
-
-- `/health` returns service status without querying PostgreSQL.
-- `/stats` returns totals for events, categories, sources, and quality classes.
-- `/events` returns imported PostgreSQL events or `[]` when empty.
-- `/categories` returns database categories or `[]` when empty.
+`/search` searches title, description, city, and province and supports category, location, date, limit, and offset filters. `/events/nearby` uses PostGIS distance calculations, returns `distance_km`, and supports category/date filters plus pagination.
 
 ## Shutdown
 

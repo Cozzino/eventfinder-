@@ -78,20 +78,17 @@ class EventListResponse(BaseModel):
     total: int
 
 
-class NearbyEventRead(BaseModel):
-    id: uuid.UUID
-    title: str
-    city: str | None = None
-    latitude: float | None = None
-    longitude: float | None = None
+class NearbyEventRead(EventRead):
     distance_km: float
-    start_date: datetime | None = None
 
 
 class NearbyEventsResponse(BaseModel):
     items: list[NearbyEventRead]
     center: dict[str, float]
     radius_km: float
+    limit: int
+    offset: int
+    total: int
 
 
 class SearchResponse(BaseModel):
