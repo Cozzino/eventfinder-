@@ -73,9 +73,9 @@ class EventRead(EventBase):
 
 class EventListResponse(BaseModel):
     items: list[EventRead]
+    total: int
     limit: int
     offset: int
-    total: int
 
 
 class NearbyEventRead(EventRead):
@@ -84,16 +84,16 @@ class NearbyEventRead(EventRead):
 
 class NearbyEventsResponse(BaseModel):
     items: list[NearbyEventRead]
-    center: dict[str, float]
-    radius_km: float
+    total: int
     limit: int
     offset: int
-    total: int
+    center: dict[str, float]
+    radius_km: float
 
 
 class SearchResponse(BaseModel):
     query: str
     items: list[EventRead]
+    total: int
     limit: int
     offset: int
-    total: int

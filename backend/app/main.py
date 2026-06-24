@@ -1,7 +1,9 @@
 from datetime import datetime
+from typing import Literal
 import uuid
 
 from fastapi import Depends, FastAPI, Query
+from fastapi.middleware.cors import CORSMiddleware
 from geoalchemy2 import Geography
 from sqlalchemy import cast, func, or_, select
 from sqlalchemy.orm import Session
@@ -13,6 +15,13 @@ app = FastAPI(
     title="EventFinder API",
     description="Core API for EventFinder event discovery.",
     version="1.0.0",
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -36,6 +45,10 @@ def _apply_event_filters(
     if date_to is not None:
         statement = statement.where(models.Event.start_date <= date_to)
     return statement
+
+
+def _pagination_count(statement: object, db: Session) -> int:
+    return int(db.scalar(statement) or 0)
 
 
 @app.get("/health", response_model=schemas.HealthResponse, tags=["system"])
@@ -67,13 +80,13 @@ def stats(db: Session = Depends(get_db)) -> schemas.StatsResponse:
 
 @app.get("/events/nearby", response_model=schemas.NearbyEventsResponse, tags=["events"])
 def nearby_events(
-    lat: float = Query(ge=-90, le=90),
-    lon: float = Query(ge=-180, le=180),
-    radius_km: float = Query(default=10, gt=0, le=500),
+    lat: float = Query(..., ge=-90, le=90, description="Required latitude between -90 and 90."),
+    lon: float = Query(..., ge=-180, le=180, description="Required longitude between -180 and 180."),
+    radius_km: float = Query(default=25, gt=0, le=200, description="Search radius in kilometers, from 0 to 200."),
     category_id: uuid.UUID | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
-    limit: int = Query(default=20, ge=1, le=200),
+    limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> schemas.NearbyEventsResponse:
@@ -86,12 +99,10 @@ def nearby_events(
         Geography(geometry_type="POINT", srid=4326),
     )
     distance_km = (func.ST_Distance(event_point, center_point) / 1000.0).label("distance_km")
-    radius_meters = radius_km * 1000.0
-
     filters = [
         models.Event.latitude.is_not(None),
         models.Event.longitude.is_not(None),
-        func.ST_DWithin(event_point, center_point, radius_meters),
+        func.ST_DWithin(event_point, center_point, radius_km * 1000.0),
     ]
     if category_id is not None:
         filters.append(models.Event.category_id == category_id)
@@ -100,8 +111,10 @@ def nearby_events(
     if date_to is not None:
         filters.append(models.Event.start_date <= date_to)
 
-    total_statement = select(func.count()).select_from(models.Event).where(*filters)
-    total = int(db.scalar(total_statement) or 0)
+    total = _pagination_count(
+        select(func.count()).select_from(models.Event).where(*filters),
+        db,
+    )
     statement = (
         select(models.Event, distance_km)
         .where(*filters)
@@ -109,35 +122,35 @@ def nearby_events(
         .limit(limit)
         .offset(offset)
     )
-    rows = db.execute(statement).all()
     items = [
         schemas.NearbyEventRead(
             **schemas.EventRead.model_validate(event).model_dump(),
             distance_km=round(float(distance), 3),
         )
-        for event, distance in rows
+        for event, distance in db.execute(statement).all()
     ]
     return schemas.NearbyEventsResponse(
         items=items,
-        center={"lat": lat, "lon": lon},
-        radius_km=radius_km,
+        total=total,
         limit=limit,
         offset=offset,
-        total=total,
+        center={"lat": lat, "lon": lon},
+        radius_km=radius_km,
     )
 
 
-@app.get("/events", response_model=list[schemas.EventRead], tags=["events"])
+@app.get("/events", response_model=schemas.EventListResponse, tags=["events"])
 def list_events(
     category_id: uuid.UUID | None = None,
     city: str | None = None,
     province: str | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
-    limit: int = Query(default=20, ge=1, le=200),
+    sort_by: Literal["start_date", "quality_score"] = "start_date",
+    limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-) -> list[models.Event]:
+) -> schemas.EventListResponse:
     statement = _apply_event_filters(
         select(models.Event),
         category_id=category_id,
@@ -146,11 +159,33 @@ def list_events(
         date_from=date_from,
         date_to=date_to,
     )
-    statement = statement.order_by(
-        models.Event.start_date.asc().nulls_last(),
-        models.Event.title,
-    ).limit(limit).offset(offset)
-    return list(db.scalars(statement).all())
+    count_statement = _apply_event_filters(
+        select(func.count()).select_from(models.Event),
+        category_id=category_id,
+        city=city,
+        province=province,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    if sort_by == "quality_score":
+        order_by = (
+            models.Event.quality_score.desc().nulls_last(),
+            models.Event.start_date.asc().nulls_last(),
+            models.Event.title,
+        )
+    else:
+        order_by = (
+            models.Event.start_date.asc().nulls_last(),
+            models.Event.title,
+        )
+
+    items = list(db.scalars(statement.order_by(*order_by).limit(limit).offset(offset)).all())
+    return schemas.EventListResponse(
+        items=items,
+        total=_pagination_count(count_statement, db),
+        limit=limit,
+        offset=offset,
+    )
 
 
 @app.get("/categories", response_model=list[schemas.CategoryRead], tags=["categories"])
@@ -167,7 +202,7 @@ def search_events(
     province: str | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
-    limit: int = Query(default=20, ge=1, le=200),
+    limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> schemas.SearchResponse:
@@ -194,16 +229,15 @@ def search_events(
         date_from=date_from,
         date_to=date_to,
     )
-    total = int(db.scalar(count_statement) or 0)
     statement = filtered.order_by(
+        models.Event.quality_score.desc().nulls_last(),
         models.Event.start_date.asc().nulls_last(),
         models.Event.title,
     ).limit(limit).offset(offset)
-    items = list(db.scalars(statement).all())
     return schemas.SearchResponse(
         query=q.strip(),
-        items=items,
+        items=list(db.scalars(statement).all()),
+        total=_pagination_count(count_statement, db),
         limit=limit,
         offset=offset,
-        total=total,
     )
